@@ -20,9 +20,6 @@
 /// <reference path="./typings.d.ts" />
 /// <reference path="./io-peer/json-rpc-peer.d.ts" />
 
-import os    from 'os'
-
-import Raven      from 'raven'
 import readPkgUp  from 'read-pkg-up'
 
 import {
@@ -39,43 +36,9 @@ import {
 }                      from './puppet-config'
 import {
   VERSION,
-  GIT_COMMIT_HASH,
 }                       from './version'
 
 const pkg = readPkgUp.sync({ cwd: __dirname })!.packageJson
-
-/**
- * Raven.io
- */
-Raven.disableConsoleAlerts()
-
-Raven
-  .config(
-    isProduction()
-      && 'https://f6770399ee65459a82af82650231b22c:d8d11b283deb441e807079b8bb2c45cd@sentry.io/179672',
-    {
-      release: VERSION,
-      tags: {
-        git_commit: GIT_COMMIT_HASH,
-        platform: process.env.WECHATY_DOCKER
-          ? 'docker'
-          : os.platform(),
-      },
-    },
-  )
-  .install()
-
-/*
-try {
-    doSomething(a[0])
-} catch (e) {
-    Raven.captureException(e)
-}
-
-Raven.context(function () {
-  doSomething(a[0])
-})
- */
 
 /**
  * to handle unhandled exceptions
@@ -112,30 +75,33 @@ export interface DefaultSetting {
   DEFAULT_PROTOCOL : string,
 }
 
-const DEFAULT_SETTING = pkg.wechaty as DefaultSetting
+const DEFAULT_SETTING = pkg['wechaty'] as DefaultSetting
 
 export class Config {
 
   public default = DEFAULT_SETTING
 
-  public apihost = process.env.WECHATY_APIHOST || DEFAULT_SETTING.DEFAULT_APIHOST
-  public serviceIp = process.env.WECHATY_PUPPET_SERVICE_IP || ''
+  public apihost = process.env['WECHATY_APIHOST'] || DEFAULT_SETTING.DEFAULT_APIHOST
+  public serviceIp = process.env['WECHATY_PUPPET_SERVICE_IP'] || ''
 
   public systemPuppetName (): PuppetModuleName {
     return (
-      process.env.WECHATY_PUPPET || PUPPET_NAME_DEFAULT
+      process.env['WECHATY_PUPPET'] || PUPPET_NAME_DEFAULT
     ).toLowerCase() as PuppetModuleName
   }
 
-  public name    = process.env.WECHATY_NAME
+  public name    = process.env['WECHATY_NAME']
 
   // DO NOT set DEFAULT, because sometimes user do not want to connect to io cloud service
-  public token   = process.env.WECHATY_TOKEN
+  public token   = process.env['WECHATY_TOKEN']
 
-  public debug   = !!(process.env.WECHATY_DEBUG)
+  public debug   = !!(process.env['WECHATY_DEBUG'])
 
-  public httpPort = process.env.PORT || process.env.WECHATY_PORT || DEFAULT_SETTING.DEFAULT_PORT
-  public docker = !!(process.env.WECHATY_DOCKER)
+  public httpPort = process.env['PORT']
+    || process.env['WECHATY_PORT']
+    || DEFAULT_SETTING.DEFAULT_PORT
+
+  public docker = !!(process.env['WECHATY_DOCKER'])
 
   constructor () {
     log.verbose('Config', 'constructor()')
@@ -172,8 +138,8 @@ export function qrcodeValueToImageUrl (qrcodeValue: string): string {
 }
 
 export function isProduction (): boolean {
-  return process.env.NODE_ENV === 'production'
-      || process.env.NODE_ENV === 'prod'
+  return process.env['NODE_ENV'] === 'production'
+      || process.env['NODE_ENV'] === 'prod'
 }
 
 /**
@@ -192,7 +158,6 @@ export {
   log,
   FileBox,
   MemoryCard,
-  Raven,
   looseInstanceOfFileBox,
 
   VERSION,

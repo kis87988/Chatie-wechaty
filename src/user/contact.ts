@@ -31,8 +31,6 @@ import {
 import { Wechaty }          from '../wechaty'
 
 import {
-  Raven,
-
   log,
   qrCodeForChatie,
   looseInstanceOfFileBox,
@@ -40,6 +38,7 @@ import {
 import {
   Sayable,
 }                           from '../types'
+import { captureException } from '../raven'
 
 import { Message }      from './message'
 import { MiniProgram }  from './mini-program'
@@ -59,8 +58,8 @@ export const POOL = Symbol('pool')
  */
 class Contact extends ContactEventEmitter implements Sayable {
 
-  static get wechaty  (): Wechaty { throw new Error('This class can not be used directory. See: https://github.com/wechaty/wechaty/issues/2027') }
-  get wechaty        (): Wechaty { throw new Error('This class can not be used directory. See: https://github.com/wechaty/wechaty/issues/2027') }
+  static get wechaty  (): Wechaty { throw new Error('This class can not be used directly. See: https://github.com/wechaty/wechaty/issues/2027') }
+  get wechaty        (): Wechaty { throw new Error('This class can not be used directly. See: https://github.com/wechaty/wechaty/issues/2027') }
 
   public static Type   = ContactType
   public static Gender = ContactGender
@@ -171,7 +170,7 @@ class Contact extends ContactEventEmitter implements Sayable {
 
     let n = 0
     for (n = 0; n < contactList.length; n++) {
-      const contact = contactList[n]
+      const contact = contactList[n]!
       // use puppet.contactValidate() to confirm double confirm that this contactId is valid.
       // https://github.com/wechaty/wechaty-puppet-padchat/issues/64
       // https://github.com/wechaty/wechaty/issues/1345
@@ -313,7 +312,7 @@ class Contact extends ContactEventEmitter implements Sayable {
   /**
    * @ignore
    */
-  public toString (): string {
+  public override toString (): string {
     if (!this.payload) {
       return this.constructor.name
     }
@@ -535,7 +534,7 @@ class Contact extends ContactEventEmitter implements Sayable {
       }
     } catch (e) {
       log.error('Contact', 'alias(%s) rejected: %s', newAlias, e.message)
-      Raven.captureException(e)
+      captureException(e)
     }
   }
 
@@ -580,7 +579,7 @@ class Contact extends ContactEventEmitter implements Sayable {
       this.payload = await this.wechaty.puppet.contactPayload(this.id)
     } catch (e) {
       log.error('Contact', 'phone(%s) rejected: %s', JSON.stringify(phoneList), e.message)
-      Raven.captureException(e)
+      captureException(e)
     }
   }
 
@@ -607,7 +606,7 @@ class Contact extends ContactEventEmitter implements Sayable {
       this.payload = await this.wechaty.puppet.contactPayload(this.id)
     } catch (e) {
       log.error('Contact', 'corporation(%s) rejected: %s', remark, e.message)
-      Raven.captureException(e)
+      captureException(e)
     }
   }
 
@@ -630,7 +629,7 @@ class Contact extends ContactEventEmitter implements Sayable {
       this.payload = await this.wechaty.puppet.contactPayload(this.id)
     } catch (e) {
       log.error('Contact', 'description(%s) rejected: %s', newDescription, e.message)
-      Raven.captureException(e)
+      captureException(e)
     }
   }
 
@@ -839,8 +838,33 @@ class Contact extends ContactEventEmitter implements Sayable {
         this.id,
         e.message,
       )
-      Raven.captureException(e)
+      captureException(e)
       throw e
+    }
+  }
+
+  public async readMark (hasRead: boolean): Promise<void>
+  public async readMark (): Promise<boolean>
+
+  /**
+   * Mark the conversation as read
+   * @param { undefined | boolean } hasRead
+   *
+   * @example
+   * const bot = new Wechaty()
+   * const contact = await bot.Contact.find({name: 'xxx'})
+   * await contact.readMark()
+   */
+
+  public async readMark (hasRead?: boolean): Promise<void | boolean> {
+    try {
+      if (typeof hasRead === 'undefined') {
+        return this.wechaty.puppet.conversationReadMark(this.id)
+      } else {
+        await this.wechaty.puppet.conversationReadMark(this.id, hasRead)
+      }
+    } catch (e) {
+      log.error('Contact', 'readMark() exception: %s', e.message)
     }
   }
 
@@ -888,8 +912,8 @@ function wechatifyContact (wechaty: Wechaty): typeof Contact {
 
   class WechatifiedContact extends Contact {
 
-    static get wechaty  () { return wechaty }
-    get wechaty        () { return wechaty }
+    static override get wechaty  () { return wechaty }
+    override get wechaty        () { return wechaty }
 
   }
 

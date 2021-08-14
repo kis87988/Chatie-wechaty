@@ -19,7 +19,7 @@
  *
  */
 
-import test  from 'blue-tape'
+import { test }  from 'tap'
 import sinon from 'sinon'
 
 import {
@@ -32,7 +32,7 @@ import { PuppetMock }   from 'wechaty-puppet-mock'
 
 import { Wechaty }      from '../wechaty'
 
-test('recalled()', async t => {
+void test('recalled()', async t => {
 
   const EXPECTED_RECALL_MESSAGE_ID = '1'
   const EXPECTED_RECALLED_MESSAGE_ID = '2'
@@ -83,20 +83,22 @@ test('recalled()', async t => {
   })
 
   sandbox.stub(puppet, 'contactPayload').callsFake(async (id: string) => {
-    await new Promise(resolve => setImmediate(resolve))
+    await new Promise(setImmediate)
     return {
       id,
       name: id,
     } as ContactPayload
   })
 
+  await puppet.login(EXPECTED_TO_CONTACT_ID)
+
   const message = wechaty.Message.load(EXPECTED_RECALL_MESSAGE_ID)
   await message.ready()
   const recalledMessage = await message.toRecalled()
-  t.assert(recalledMessage, 'recalled message should exist.')
+  t.ok(recalledMessage, 'recalled message should exist.')
   t.equal(recalledMessage!.id, EXPECTED_RECALLED_MESSAGE_ID, 'Recalled message should have the right id.')
   t.equal(recalledMessage!.talker().id, EXPECTED_FROM_CONTACT_ID, 'Recalled message should have the right from contact id.')
-  t.equal(recalledMessage!.to()!.id, EXPECTED_TO_CONTACT_ID, 'Recalled message should have the right to contact id.')
+  t.equal(recalledMessage!.listener()!.id, EXPECTED_TO_CONTACT_ID, 'Recalled message should have the right to contact id.')
   t.equal(recalledMessage!.room()!.id, EXPECTED_ROOM_ID, 'Recalled message should have the right room id.')
 
   await wechaty.stop()

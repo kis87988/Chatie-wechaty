@@ -37,12 +37,13 @@ import {
   FileBox,
 
   log,
-  Raven,
   looseInstanceOfFileBox,
 }                         from '../config'
 import {
   Sayable,
 }                       from '../types'
+
+import { captureException } from '../raven'
 
 import {
   Contact,
@@ -65,8 +66,8 @@ import { Image }        from './image'
  */
 class Message extends EventEmitter implements Sayable {
 
-  static get wechaty  (): Wechaty { throw new Error('This class can not be used directory. See: https://github.com/wechaty/wechaty/issues/2027') }
-  get wechaty        (): Wechaty { throw new Error('This class can not be used directory. See: https://github.com/wechaty/wechaty/issues/2027') }
+  static get wechaty  (): Wechaty { throw new Error('This class can not be used directly. See: https://github.com/wechaty/wechaty/issues/2027') }
+  get wechaty        (): Wechaty { throw new Error('This class can not be used directly. See: https://github.com/wechaty/wechaty/issues/2027') }
 
   /**
    *
@@ -101,7 +102,7 @@ class Message extends EventEmitter implements Sayable {
       log.warn('Message', 'findAll() got more than one(%d) result', messageList.length)
     }
 
-    return messageList[0]
+    return messageList[0]!
   }
 
   /**
@@ -133,7 +134,7 @@ class Message extends EventEmitter implements Sayable {
     } catch (e) {
       log.warn('Message', 'findAll() rejected: %s', e.message)
       console.error(e)
-      Raven.captureException(e)
+      captureException(e)
       return [] // fail safe
     }
   }
@@ -193,7 +194,7 @@ class Message extends EventEmitter implements Sayable {
   /**
    * @ignore
    */
-  public toString () {
+  public override toString () {
     if (!this.payload) {
       return this.constructor.name
     }
@@ -261,23 +262,30 @@ class Message extends EventEmitter implements Sayable {
     //   return
     // }
 
-    const fromId = this.payload.fromId
-    if (!fromId) {
+    const talkerId = this.payload.fromId
+    if (!talkerId) {
       // Huan(202011): It seems that the fromId will never be null?
       // return null
       throw new Error('payload.fromId is null?')
     }
 
-    const from = this.wechaty.Contact.load(fromId)
-    return from
+    let talker
+    if (talkerId === this.wechaty.puppet.selfId()) {
+      talker = this.wechaty.ContactSelf.load(talkerId)
+    } else {
+      talker = this.wechaty.Contact.load(talkerId)
+    }
+    return talker
   }
 
   /**
-   * Use `message.talker()` to replace `message.from()` #2094
+   * @depreacated Use `message.talker()` to replace `message.from()`
    *  https://github.com/wechaty/wechaty/issues/2094
    */
   public from (): null | Contact {
-    log.warn('Message', 'from() is deprecated, use talker() instead.')
+    log.warn('Message', 'from() is deprecated, use talker() instead. Call stack: %s',
+      new Error().stack,
+    )
     try {
       return this.talker()
     } catch (e) {
@@ -289,19 +297,37 @@ class Message extends EventEmitter implements Sayable {
    * Get the destination of the message
    * Message.to() will return null if a message is in a room, use Message.room() to get the room.
    * @returns {(Contact|null)}
+   * @deprecated use `listener()` instead
    */
   public to (): null | Contact {
+    // Huan(202108): I want to deprecate this method name in the future,
+    //  and use `message.listener()` to replace it.
+    return this.listener()
+  }
+
+  /**
+   * Get the destination of the message
+   * Message.listener() will return null if a message is in a room,
+   * use Message.room() to get the room.
+   * @returns {(Contact|null)}
+   */
+  public listener (): null | Contact {
     if (!this.payload) {
       throw new Error('no payload')
     }
 
-    const toId = this.payload.toId
-    if (!toId) {
+    const listenerId = this.payload.toId
+    if (!listenerId) {
       return null
     }
 
-    const to = this.wechaty.Contact.load(toId)
-    return to
+    let listener
+    if (listenerId === this.wechaty.puppet.selfId()) {
+      listener = this.wechaty.ContactSelf.load(listenerId)
+    } else {
+      listener = this.wechaty.Contact.load(listenerId)
+    }
+    return listener
   }
 
   /**
@@ -750,8 +776,13 @@ class Message extends EventEmitter implements Sayable {
     return contactList
   }
 
+  /**
+   * @deprecated mention() DEPRECATED. use mentionList() instead.
+   */
   public async mention (): Promise<Contact[]> {
-    log.warn('Message', 'mention() DEPRECATED. use mentionList() instead.')
+    log.warn('Message', 'mention() DEPRECATED. use mentionList() instead. Call stack: %s',
+      new Error().stack,
+    )
     return this.mentionList()
   }
 
@@ -1050,8 +1081,8 @@ function wechatifyMessage (wechaty: Wechaty): typeof Message {
 
   class WechatifiedMessage extends Message {
 
-    static get wechaty  () { return wechaty }
-    get wechaty        () { return wechaty }
+    static override get wechaty  () { return wechaty }
+    override get wechaty        () { return wechaty }
 
   }
 
